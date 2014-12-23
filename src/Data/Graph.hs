@@ -82,20 +82,18 @@ type DFSInfo  = (Visited, Pred, [BackEdge])
 
 dfs :: Graph -> (Pred, [BackEdge])
 dfs g@Graph{adj} =
-    let (_, p, e) = go startInfo Nothing $ Vertex 0
+    let (_, p, e) = go Nothing (Vertex 0) startInfo
     in (p, e)
   where startInfo = (S.empty, M.empty, [])
-        go :: DFSInfo -> VPred -> Vertex -> DFSInfo
-        go (vis,pred,backs) p v|S.member v vis = (vis, pred, backs)
+        go :: VPred -> Vertex -> DFSInfo -> DFSInfo
+        go p v (vis,pred,backs)|S.member v vis = (vis, pred, backs)
                                |otherwise =
           let vcs   = filter (\c -> Just c /= p) $ children g v
               (backVs, unvisited) = partition (\c -> S.member c vis) vcs
               vvis  = S.insert v vis
               vpred = M.insert v p pred
               vbcks = map (const (unVert v) &&& unVert) backVs
-          in foldr (go' (Just v)) (vvis, vpred, backs ++ vbcks) unvisited
-        go' :: VPred -> Vertex -> DFSInfo -> DFSInfo
-        go' p v info = go info p v
+          in foldr (go (Just v)) (vvis, vpred, backs ++ vbcks) unvisited
 
 findBestCycle :: Graph -> Maybe [Vertex]
 findBestCycle g = let (preds, backs) = dfs g
