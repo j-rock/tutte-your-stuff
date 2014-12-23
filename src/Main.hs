@@ -1,4 +1,6 @@
 module Main (main) where
 
+import Data.Graph
+
 main :: IO ()
-main = undefined
+main = print $ findBestCycle $ hubGraph 10000
