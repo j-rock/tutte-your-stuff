@@ -84,11 +84,11 @@ hubGraph n = Graph $ makeAdj (n+1) $ circleEdges n ++ hub'
 
 type Visited  = Set Vertex
 type VPred    = Maybe Vertex
-type Pred     = Map Vertex VPred
+type PredMap  = Map Vertex VPred
 type BackEdge = Edge
-type DFSInfo  = (Visited, Pred, [BackEdge])
+type DFSInfo  = (Visited, PredMap, [BackEdge])
 
-dfs :: Graph -> (Pred, [BackEdge])
+dfs :: Graph -> (PredMap, [BackEdge])
 dfs g@Graph{adj} =
     let (_, p, e) = go Nothing (Vertex 0) startInfo
     in (p, e)
@@ -103,17 +103,29 @@ dfs g@Graph{adj} =
               vbcks = map (const (unVert v) &&& unVert) backVs
           in foldr (go (Just v)) (vvis, vpred, backs ++ vbcks) unvisited
 
-findBestCycle :: Graph -> [Vertex]
-findBestCycle g = let (preds, backs) = dfs g
-                      backEdgePaths = map (convertPath preds) backs
-                  in safeMax $ map (length &&& id) $ backEdgePaths
-  where safeMax [] = []
-        safeMax xs = snd $ maximumBy (comparing fst) xs
-        convertPath preds (a, b) =
-            let va = Vertex a; vb = Vertex b
-            in buildPath preds vb va []
-        buildPath preds vb va nodes| va == vb = (vb:nodes)
-                                   | otherwise =
-            case preds M.! va of
-              Nothing -> nodes
-              Just vc -> buildPath preds vb vc (va:nodes)
+
+type Cycle = [Vertex]
+
+cycles :: Graph -> [Cycle]
+cycles g =
+    let retrieveCycle :: PredMap -> Edge -> Cycle
+        retrieveCycle preds (a,b) = buildPath vb va []
+          where (va, vb) = (Vertex a, Vertex b)
+                buildPath u v path|u == v = u:path
+                                  |otherwise =
+                    case preds M.! v of
+                      Nothing -> path
+                      Just w  -> buildPath u w (v:path)
+        (preds, backs) = dfs g
+    in  map (retrieveCycle preds) backs
+
+findBestCycle :: Graph -> Cycle
+findBestCycle g@Graph{adj} =
+    case cycles g of
+      []  -> []
+      [c] -> c
+      cs  -> head cs
+    --   cs  -> let cs' = filter ((< M.size adj) . length) cs
+    --          in if length cs' > 0
+    --             then maximumBy (comparing length) cs'
+    --             else head cs

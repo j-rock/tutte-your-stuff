@@ -6,8 +6,10 @@
 module Tutte
   (
     startTutte
-  , TutteState(..)
+  , getGraph
+  , Tutte(..)
   , advanceTutte
+  , (!)
   ) where
 
 import Control.Arrow ((***))
@@ -20,14 +22,20 @@ type Map = M.Map
 
 type Vector2 = (Float, Float)
 
-data TutteState =
+data Tutte =
     Tutte
     { graph :: Graph
     , fixedVerts :: Set Vertex
     , vertPositions :: Map Vertex Vector2
     } deriving (Show)
 
-startTutte :: Graph -> TutteState
+(!) :: Tutte -> Vertex -> Vector2
+t ! v = vertPositions t M.! v
+
+getGraph :: Tutte -> Graph
+getGraph = graph
+
+startTutte :: Graph -> Tutte
 startTutte graph =
     let vertPositions = makeRing cycleVerts
                           `M.union`
@@ -41,21 +49,21 @@ startTutte graph =
 makeRing :: [Vertex] -> Map Vertex Vector2
 makeRing vs = let numVs = fromIntegral $ length vs
                   dtheta = (2 * 3.14159265358) / numVs
-              in M.fromList $ map (id *** circle dtheta numVs) $ zip vs [0.0..]
-  where circle :: Float -> Float -> Float -> Vector2
-        circle dtheta radius i = let i' = i * dtheta
-                                 in (radius * cos i', radius * sin i')
+              in M.fromList $ map (id *** circle dtheta) $ zip vs [0.0..]
+  where circle :: Float -> Float -> Vector2
+        circle dtheta i = let i' = i * dtheta
+                                 in (cos i', sin i')
 
--- This is inherently parallel...
--- advanceTutte is O(EVlogV)
--- could be O(EVlogV/p) with p cores
-advanceTutte :: TutteState -> TutteState
+advanceTutte :: Tutte -> Tutte
 advanceTutte t@Tutte{..} =
     let newPos = M.mapWithKey findNewPosition vertPositions
     in t{vertPositions = newPos}
   where findNewPosition v oldPos|S.member v fixedVerts = oldPos
-                                |otherwise = baryCenter $ neighborPos v
+                                |otherwise = slowBaryCenter oldPos $ neighborPos v
         neighborPos v = map (vertPositions M.!) $ neighbors graph v
+
+slowBaryCenter :: Vector2 -> [Vector2] -> Vector2
+slowBaryCenter v vecs = baryCenter $ replicate 10 v ++ vecs
 
 baryCenter :: [Vector2] -> Vector2
 baryCenter vecs = go vecs (0.0,0.0) 0.0
