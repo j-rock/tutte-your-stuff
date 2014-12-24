@@ -3,18 +3,17 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module Control.Tutte
+module Tutte
   (
     startTutte
   , TutteState(..)
   , advanceTutte
   ) where
 
-import Control.Applicative ((<$>))
 import Control.Arrow ((***))
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
-import Data.Graph (vertices, Graph, Vertex, findBestCycle, neighbors)
+import Graph (vertices, Graph, Vertex, findBestCycle, neighbors)
 
 type Set = S.Set
 type Map = M.Map

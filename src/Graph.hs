@@ -1,6 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Data.Graph
+module Graph
   (
     Vertex(..)
   , Adjacency
