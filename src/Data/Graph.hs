@@ -8,7 +8,8 @@ module Data.Graph
   , adj
   , Edge
   , mkGraph
-  , children
+  , neighbors
+  , vertices
   , completeGraph
   , hubGraph
   , dfs
@@ -24,9 +25,12 @@ import Data.Ord (comparing)
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
+type Set = S.Set
+type Map = M.Map
+
 
 newtype Vertex = Vertex {unVert :: Int} deriving (Eq, Ord, Show)
-type Adjacency = M.Map Vertex (S.Set Vertex)
+type Adjacency = Map Vertex (Set Vertex)
 data Graph = Graph {adj :: Adjacency} deriving (Eq, Ord, Show)
 
 
@@ -57,6 +61,12 @@ makeAdj numV edges =
                      in add v0' v1' . add v1' v0'
         add u v = M.insertWith S.union u $ S.singleton v
 
+vertices :: Graph -> [Vertex]
+vertices Graph{adj} = M.keys adj
+
+neighbors :: Graph -> Vertex -> [Vertex]
+neighbors Graph{adj} v = S.toList $ adj M.! v
+
 completeGraph :: Int -> Graph
 completeGraph n = Graph $ makeAdj n complete'
   where complete' = [(u,v) | u <- [0..n-2], v <- [u..n-1], u /= v]
@@ -70,13 +80,11 @@ hubGraph :: Int -> Graph
 hubGraph n = Graph $ makeAdj (n+1) $ circleEdges n ++ hub'
   where hub' = [(u,n) | u <- [0..n-1]]
 
-children :: Graph -> Vertex -> [Vertex]
-children Graph{adj} v = S.toList $ adj M.! v
 
 
-type Visited  = S.Set Vertex
+type Visited  = Set Vertex
 type VPred    = Maybe Vertex
-type Pred     = M.Map Vertex VPred
+type Pred     = Map Vertex VPred
 type BackEdge = Edge
 type DFSInfo  = (Visited, Pred, [BackEdge])
 
@@ -88,19 +96,19 @@ dfs g@Graph{adj} =
         go :: VPred -> Vertex -> DFSInfo -> DFSInfo
         go p v (vis,pred,backs)|S.member v vis = (vis, pred, backs)
                                |otherwise =
-          let vcs   = filter (\c -> Just c /= p) $ children g v
+          let vcs   = filter (\c -> Just c /= p) $ neighbors g v
               (backVs, unvisited) = partition (\c -> S.member c vis) vcs
               vvis  = S.insert v vis
               vpred = M.insert v p pred
               vbcks = map (const (unVert v) &&& unVert) backVs
           in foldr (go (Just v)) (vvis, vpred, backs ++ vbcks) unvisited
 
-findBestCycle :: Graph -> Maybe [Vertex]
+findBestCycle :: Graph -> [Vertex]
 findBestCycle g = let (preds, backs) = dfs g
                       backEdgePaths = map (convertPath preds) backs
                   in safeMax $ map (length &&& id) $ backEdgePaths
-  where safeMax [] = Nothing
-        safeMax xs = Just $ snd $ maximumBy (comparing fst) xs
+  where safeMax [] = []
+        safeMax xs = snd $ maximumBy (comparing fst) xs
         convertPath preds (a, b) =
             let va = Vertex a; vb = Vertex b
             in buildPath preds vb va []
