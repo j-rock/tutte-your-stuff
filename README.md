@@ -1,10 +1,11 @@
 # tutte-your-stuff
 
-Using Haskell + OpenGL to demonstrate planar graph drawing methods.
+Using Haskell + OpenGL to demonstrate force-directed graph drawing.
 
 Implemented so far:
-* Tutte's algorithm
-* Fruchterman and Reingold's algorithm
+* Tutte's algorithm (1963)
+* Fruchterman and Reingold's algorithm (1991)
+* Walshaw's algorithm (2003)
 
 ### Installation instructions
 You will need

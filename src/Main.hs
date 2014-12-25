@@ -21,6 +21,7 @@ import Graphics.UI.GLUT
 import Graph
 import Tutte
 import FruRein
+import Walshaw
 import OpenGLApp
 
 main :: IO ()
@@ -87,7 +88,7 @@ algoApp _         _ = error "Can't use Algo for construction"
 
 buildAppData :: [Graph] -> AppData Algo
 buildAppData graphs = buildAppData' (fromList graphs) (fromList allAlgos)
-  where allAlgos = [AlgoC tutte, AlgoC fruRein]
+  where allAlgos = [AlgoC tutte, AlgoC fruRein, AlgoC walshaw]
 
 buildAppData' :: Zipper Graph -> Zipper Algo -> AppData Algo
 buildAppData' graphs algos =
