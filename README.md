@@ -30,9 +30,13 @@ $> cabal run
 
 While you're inside the program, press:
 * A and D to rotate the graph
-* Left and Right arrow keys to switch graphs
-* Up and Down arrow keys to switch planarization methods
+* Left and Right arrow keys to switch graphs (due to lazy evaluation, you can keep generating new random graphs just by "going" right)
+* Up and Down arrow keys to switch planarization methods (the sequence goes Tutte <-> Fruchterman-Reingold <-> Walshaw)
 * Space bar to make a single iteration
-* Return to make the graph autonomously iterate
+* Hit return to make the graph autonomously iterate
+
+### Demo
+For those who cannot install the app, I put up a video of it running on [Youtube]
 
 [this awesome paper]:https://cs.brown.edu/~rt/gdhandbook/chapters/force-directed.pdf
+[Youtube]:http://youtu.be/uTGIY4P7A-8
