@@ -156,14 +156,14 @@ convertPos = realToFrac *** realToFrac
 drawNode :: (Float, Float) -> IO ()
 drawNode pos = preservingMatrix $ do
   let (x, y) = convertPos pos
-  color (Color3 1.0 0.1 0.1 :: Color3 GLfloat)
+  color (Color3 0.839 0.117 0.323 :: Color3 GLfloat)
   translate $ Vector3 x y 0.0
   renderObject Solid $ Sphere' 0.03 8 8
 
 drawEdge :: (Float, Float) -> (Float, Float) -> IO ()
 drawEdge s t = renderPrimitive Lines $ do
   let ((sx, sy), (tx, ty)) = (convertPos *** convertPos) (s, t)
-  color (Color3 0.0 1.0 0.2 :: Color3 GLfloat)
+  color (Color3 0.6 0.0 0.8 :: Color3 GLfloat)
   vertex $ Vertex3 sx sy 0.0
   vertex $ Vertex3 tx ty 0.0
 

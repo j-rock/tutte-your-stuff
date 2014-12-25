@@ -22,7 +22,7 @@ openGLMain GLApp{..} = do
     initialDisplayMode $= [DoubleBuffered, RGBMode, WithDepthBuffer]
     window <- createWindow title
     windowSize $= Size 540 400
-    clearColor $= Color4 0 0.1 0.3 0.0
+    clearColor $= Color4 0.05 0.05 0.05 0.0
     clearDepth $= 1
     shadeModel $= Smooth
     depthFunc $= Just Less

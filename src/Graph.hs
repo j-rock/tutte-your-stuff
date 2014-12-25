@@ -51,7 +51,9 @@ mkGraph :: Int     -- the number of vertices
 mkGraph numV edges = do
     guard $ numV > 0
     guard $ all withinBounds edges
-    return $ Graph $ makeAdj numV edges
+    let adjacency = makeAdj numV edges
+    guard $ not $ M.null adjacency
+    return $ Graph adjacency
   where bnded x = x >= 0 && x < numV
         withinBounds (x, y) = bnded x && bnded y
 
@@ -96,7 +98,7 @@ type DFSInfo  = (Visited, PredMap, [BackEdge])
 
 dfs :: Graph -> (PredMap, [BackEdge])
 dfs g@Graph{adj} =
-    let (_, p, e) = go Nothing (Vertex 0) startInfo
+    let (_, p, e) = go Nothing (fst $ M.elemAt 0 adj) startInfo
     in (p, e)
   where startInfo = (S.empty, M.empty, [])
         go :: VPred -> Vertex -> DFSInfo -> DFSInfo
