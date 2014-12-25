@@ -1,88 +1,136 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE RankNTypes #-}
+
 
 module Main
   (
     main
   ) where
 
+import Control.Applicative ((<$>))
 import Control.Arrow ((***))
 import Control.Concurrent.STM.TVar
 import Control.Monad.STM
 import Control.Monad (forM_)
-import Data.Char (ord)
+import Data.Map.Strict (Map, (!), keys)
 
 import Graphics.UI.GLUT
 
 import Graph
 import Tutte
+import FruRein
 import OpenGLApp
 
 main :: IO ()
 main = do
-  tAppData <- atomically $ newTVar basicAppData
+  tAppData <- atomically . newTVar =<< buildAppData <$> randomGraphs
   openGLMain $ GLApp
-    { title = "Tutte's Algorithm"
+    { title = "Graph Planarization"
     , display = appDisplay tAppData
     , special = appSpecial tAppData
     , keyboard = appKeyboard tAppData
     }
 
+data Zipper a = Zipper [a] a [a]
+fromList :: [a] -> Zipper a
+fromList []     = error "Bad list passed to zipper"
+fromList (x:xs) = Zipper [] x xs
 
-data AppData =
+pick :: Zipper a -> a
+pick (Zipper _ x _) = x
+
+left :: Zipper a -> Zipper a
+left z@(Zipper [] _ _)    = z
+left (Zipper (x:xs) y ys) = Zipper xs x (y:ys)
+
+right :: Zipper a -> Zipper a
+right z@(Zipper _ _ [])    = z
+right (Zipper ys y (x:xs)) = Zipper (y:ys) x xs
+
+data AppData a =
     AppData
-    { graphs :: [Graph]
-    , tutte  :: Tutte
-    , theta :: GLdouble
-    , go :: Bool
+    { graphs :: Zipper Graph
+    , algos  :: ForceAlgo a => Zipper Algo
+    , algo   :: ForceAlgo a => a
+    , theta  :: GLdouble
+    , go     :: Bool
     }
 
-buildAppData :: [Graph] -> AppData
-buildAppData graphs = AppData{go = False, graphs, tutte = startTutte $ head graphs, theta = 3.1415926 * 1.5}
+type TApp a = TVar (AppData a)
 
-basicAppData :: AppData
-basicAppData = buildAppData
-    [ completeGraph 4
-    , hubGraph 7
-    , hubGraph 50
-    , g
-    ]
-  where Just g = mkGraph 6 [(0,1),(1,2),(2,3),(3,4),(4,0),(3,5),(1,5)]
+graph :: AppData a -> Graph
+graph = pick . graphs
+
+verts :: ForceAlgo a => AppData a -> Map Graph.Vertex (Float, Float)
+verts AppData{..} = positions algo
+
+advanceApp :: ForceAlgo a => TApp a -> STM ()
+advanceApp tApp = do
+    a@AppData{..} <- readTVar tApp
+    writeTVar tApp a{algo = advance algo}
 
 
+data Algo = forall a. ForceAlgo a => AlgoC (Graph -> a)
+          | forall a. ForceAlgo a => Algo a
 
+instance ForceAlgo Algo where
+    positions (Algo x) = positions x
+    positions _        = error "Can't use AlgoC for positions"
+    advance   (Algo x) = Algo $ advance x
+    advance   _        = error "Can't use AlgoC for advance"
 
-type GraphChangeFunc = [Graph] -> [Graph]
+algoApp :: Algo -> Graph -> Algo
+algoApp (AlgoC f) g = Algo (f g)
+algoApp _         _ = error "Can't use Algo for construction"
 
-appSpecial :: TVar AppData -> SpecialCallback
+buildAppData :: [Graph] -> AppData Algo
+buildAppData graphs = buildAppData' (fromList graphs) (fromList allAlgos)
+  where allAlgos = [AlgoC tutte, AlgoC fruRein]
+
+buildAppData' :: Zipper Graph -> Zipper Algo -> AppData Algo
+buildAppData' graphs algos =
+    AppData
+    { graphs
+    , algos
+    , algo = (pick algos) `algoApp` (pick graphs)
+    , theta = 3.1415926 * 1.5
+    , go = False
+    }
+
+appSpecial :: TApp Algo -> SpecialCallback
 appSpecial tAppData key _ =
     let
-        switcher :: GraphChangeFunc -> IO ()
+        switcher :: (Zipper Graph -> Zipper Graph) -> IO ()
         switcher graphChange = atomically $ do
-            AppData{graphs, theta} <- readTVar tAppData
-            let app' = buildAppData $ graphChange graphs
+            AppData{..} <- readTVar tAppData
+            let app' = buildAppData' (graphChange graphs) algos
             writeTVar tAppData app'{theta}
 
-        switchGraphLeft :: IO ()
-        switchGraphLeft = switcher (\gs -> last gs : init gs)
-
-        switchGraphRight :: IO ()
-        switchGraphRight = switcher (\gs -> tail gs ++ [head gs])
+        switcher' :: (Zipper Algo -> Zipper Algo) -> IO ()
+        switcher' algoChange = atomically $ do
+            AppData{..} <- readTVar tAppData
+            let app' = buildAppData' graphs $ algoChange algos
+            writeTVar tAppData app'{theta}
 
     in case key of
-         KeyLeft  -> switchGraphLeft
-         KeyRight -> switchGraphRight
+         KeyLeft  -> switcher left
+         KeyRight -> switcher right
+         KeyUp    -> switcher' left
+         KeyDown  -> switcher' right
          _        -> return ()
 
-appDisplay :: TVar AppData -> DisplayCallback
+appDisplay :: TApp Algo -> DisplayCallback
 appDisplay tAppData =
     let
-        drawVertyBits :: Graph -> Tutte -> Graph.Vertex -> IO ()
-        drawVertyBits g t v = do
-          let vPos = t ! v
+        drawVertyBits :: Graph -> Map Graph.Vertex (Float, Float) -> IO ()
+        drawVertyBits g m = forM_ (keys m) $ \v -> do
+          let vPos = m ! v
           drawNode vPos
           forM_ (neighbors g v) $ \w -> do
             if unVert w < unVert v
-            then drawEdge vPos (t ! w)
+            then drawEdge vPos (m ! w)
             else return ()
 
         center = Vertex3 0.0 0.0 0.0
@@ -94,13 +142,12 @@ appDisplay tAppData =
                 z = 3 * sin theta
 
     in     do
-       a@AppData{go, tutte, theta} <- atomically $ readTVar tAppData
+       a@AppData{..} <- atomically $ readTVar tAppData
        lookAt (eye theta) center up
-       let graph = getGraph tutte
-           verts = vertices graph
-       forM_ verts $ drawVertyBits graph tutte
-       if go then atomically $ writeTVar tAppData a{tutte = advanceTutte tutte}
+       drawVertyBits (Main.graph a) (verts a)
+       if go then atomically $ advanceApp tAppData
              else return ()
+
 
 convertPos :: (Float, Float) -> (GLfloat, GLfloat)
 convertPos = realToFrac *** realToFrac
@@ -108,19 +155,19 @@ convertPos = realToFrac *** realToFrac
 drawNode :: (Float, Float) -> IO ()
 drawNode pos = preservingMatrix $ do
   let (x, y) = convertPos pos
-  color (Color3 1.0 0.0 0.0 :: Color3 GLfloat)
+  color (Color3 1.0 0.1 0.1 :: Color3 GLfloat)
   translate $ Vector3 x y 0.0
-  renderObject Solid $ Sphere' 0.1 6 6
+  renderObject Solid $ Sphere' 0.03 8 8
 
 drawEdge :: (Float, Float) -> (Float, Float) -> IO ()
 drawEdge s t = renderPrimitive Lines $ do
   let ((sx, sy), (tx, ty)) = (convertPos *** convertPos) (s, t)
-  color (Color3 0.0 1.0 0.0 :: Color3 GLfloat)
+  color (Color3 0.0 1.0 0.2 :: Color3 GLfloat)
   vertex $ Vertex3 sx sy 0.0
   vertex $ Vertex3 tx ty 0.0
 
 
-appKeyboard :: TVar AppData -> KeyboardCallback
+appKeyboard :: TApp Algo -> KeyboardCallback
 appKeyboard tAppData key _ =
     let
         changeTheta :: GLdouble -> IO ()
@@ -129,9 +176,7 @@ appKeyboard tAppData key _ =
             writeTVar tAppData a{theta = theta + dtheta}
 
         stepper :: IO ()
-        stepper = atomically $ do
-          a@AppData{tutte} <- readTVar tAppData
-          writeTVar tAppData a{tutte = advanceTutte tutte}
+        stepper = atomically $ advanceApp tAppData
 
         setGo :: IO ()
         setGo = atomically $ do

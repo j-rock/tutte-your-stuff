@@ -1,15 +1,11 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE InstanceSigs #-}
 
 module Tutte
   (
-    startTutte
-  , getGraph
-  , Tutte(..)
-  , advanceTutte
-  , (!)
+    ForceAlgo(..)
+  , tutte
+  , Tutte
   ) where
 
 import Control.Arrow ((***))
@@ -19,28 +15,30 @@ import Graph (vertices, Graph, Vertex, findBestCycle, neighbors)
 
 type Set = S.Set
 type Map = M.Map
-
 type Vector2 = (Float, Float)
+
+
+class ForceAlgo a where
+    positions :: a -> Map Vertex (Float, Float)
+    advance   :: a -> a
 
 data Tutte =
     Tutte
-    { graph :: Graph
-    , fixedVerts :: Set Vertex
+    { graph         :: Graph
     , vertPositions :: Map Vertex Vector2
-    } deriving (Show)
+    , fixedVerts    :: Set Vertex
+    }
 
-(!) :: Tutte -> Vertex -> Vector2
-t ! v = vertPositions t M.! v
+instance ForceAlgo Tutte where
+    positions = vertPositions
+    advance   = advancer 10
 
-getGraph :: Tutte -> Graph
-getGraph = graph
-
-startTutte :: Graph -> Tutte
-startTutte graph =
+tutte :: Graph -> Tutte
+tutte graph =
     let vertPositions = makeRing cycleVerts
                           `M.union`
-                        (M.fromList $ zip nonCycleVerts (repeat (0.0, 0.0)))
-    in Tutte{graph, fixedVerts, vertPositions}
+                        (M.fromList $ zip nonCycleVerts $ repeat (0.0, 0.0))
+    in Tutte{graph, vertPositions, fixedVerts}
   where cycleVerts = findBestCycle graph
         fixedVerts = S.fromList cycleVerts
         nonCycleVerts = filter (\v -> not $ S.member v fixedVerts) $ vertices graph
@@ -54,18 +52,16 @@ makeRing vs = let numVs = fromIntegral $ length vs
         circle dtheta i = let i' = i * dtheta
                                  in (cos i', sin i')
 
-advanceTutte :: Tutte -> Tutte
-advanceTutte t@Tutte{..} =
+advancer :: Int -> Tutte -> Tutte
+advancer i t@Tutte{..} =
     let newPos = M.mapWithKey findNewPosition vertPositions
     in t{vertPositions = newPos}
   where findNewPosition v oldPos|S.member v fixedVerts = oldPos
-                                |otherwise = slowBaryCenter oldPos $ neighborPos v
+                                |otherwise = baryCenter $ replicate i oldPos ++ neighborPos v
         neighborPos v = map (vertPositions M.!) $ neighbors graph v
-
-slowBaryCenter :: Vector2 -> [Vector2] -> Vector2
-slowBaryCenter v vecs = baryCenter $ replicate 10 v ++ vecs
 
 baryCenter :: [Vector2] -> Vector2
 baryCenter vecs = go vecs (0.0,0.0) 0.0
   where go []            (x, y) l = let minL = max 1.0 l in (x / minL, y / minL)
         go ((vx, vy):vs) (x, y) l = go vs (x+vx,y+vy) (l+1.0)
+

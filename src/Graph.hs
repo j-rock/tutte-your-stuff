@@ -14,12 +14,16 @@ module Graph
   , hubGraph
   , dfs
   , findBestCycle
+  , randomGraphs
   )
 
   where
 
+import Control.Applicative ((<$>))
 import Control.Arrow ((&&&))
 import Control.Monad (guard)
+import Control.Monad.Random
+import Data.Maybe (catMaybes)
 import Data.List (partition, maximumBy)
 import Data.Ord (comparing)
 import qualified Data.Set as S
@@ -54,9 +58,11 @@ mkGraph numV edges = do
 makeAdj :: Int -> [Edge] -> Adjacency
 makeAdj numV edges =
     let baseAdj = M.fromList $ map (Vertex &&& const S.empty) [0..numV-1]
-    in foldr f baseAdj edges
+    in M.filter (not . S.null) $ foldr f baseAdj edges
   where f :: Edge -> Adjacency -> Adjacency
-        f (v0, v1) = let v0' = Vertex v0
+        f (v0, v1)|v0 == v1  = id
+                  |otherwise =
+                     let v0' = Vertex v0
                          v1' = Vertex v1
                      in add v0' v1' . add v1' v0'
         add u v = M.insertWith S.union u $ S.singleton v
@@ -124,8 +130,25 @@ findBestCycle g@Graph{adj} =
     case cycles g of
       []  -> []
       [c] -> c
-      cs  -> head cs
-    --   cs  -> let cs' = filter ((< M.size adj) . length) cs
-    --          in if length cs' > 0
-    --             then maximumBy (comparing length) cs'
-    --             else head cs
+      cs  -> let cs' = filter ((< M.size adj) . length) cs
+             in if length cs' > 0
+                then maximumBy (comparing length) cs'
+                else head cs
+
+
+randomGraphs :: IO [Graph]
+randomGraphs =
+  let
+      randomGraph :: RandomGen g => Rand g (Maybe Graph)
+      randomGraph = do
+        numV <- getRandomR (4, 20)
+        numE <- getRandomR (2*numV, 4*numV)
+        randNums <- take numE <$> getRandomRs (0, numV-1)
+        return $ mkGraph numV $ chunk2 randNums
+
+      chunk2 :: [Int] -> [Edge]
+      chunk2 []       = []
+      chunk2 [_]      = []
+      chunk2 (x:y:xs) = (x,y) : chunk2 xs
+
+  in catMaybes <$> (evalRandIO $ sequence $ repeat randomGraph)

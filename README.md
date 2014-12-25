@@ -1,6 +1,10 @@
 # tutte-your-stuff
 
-Using Haskell + OpenGL to demonstrate Tutte's graph drawing algorithm.
+Using Haskell + OpenGL to demonstrate planar graph drawing methods.
+
+Implemented so far:
+* Tutte's algorithm
+* Fruchterman and Reingold's algorithm
 
 ### Installation instructions
 You will need
@@ -22,7 +26,8 @@ $> cabal run
 ```
 
 While you're inside the program, press:
-* a and d to rotate the graph
-* <- and -> arrow keys to switch graphs
-* space bar to make a single iteration
-* return to make the graph automatically iterate.
+* A and D to rotate the graph
+* Left and Right arrow keys to switch graphs
+* Up and Down arrow keys to switch planarization methods
+* Space bar to make a single iteration
+* Return to make the graph autonomously iterate
