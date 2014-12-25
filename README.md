@@ -15,7 +15,7 @@ You will need
 * The OpenGL / GLUT C libraries installed (presumably)
 * cabal >= 1.20
 
-Now, clone this directory:
+Now, clone this repo:
 ```sh
 $> cd tutte-your-stuff
 $> cabal sandbox init
@@ -23,12 +23,12 @@ $> cabal install
 ```
 
 ### Running instructions
-To actually run the program, execute:
+While inside the directory (after performing cabal install):
 ```sh
 $> cabal run
 ```
 
-While you're inside the program, press:
+As the program runs, press:
 * A and D to rotate the graph
 * Left and Right arrow keys to switch graphs (due to lazy evaluation, you can keep generating new random graphs just by "going" right)
 * Up and Down arrow keys to switch planarization methods (the sequence goes Tutte <-> Fruchterman-Reingold <-> Walshaw)
